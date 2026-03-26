@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user in the system with a specific role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique Firebase Auth ID." },
+        "name": { "type": "string", "description": "The user's full name." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "role": {
+          "type": "string",
+          "enum": ["founder", "gm", "bu_head", "owner", "reviewer", "sma", "admin"],
+          "description": "The user's role in the system."
+        },
+        "business_unit": { "type": "string", "description": "The business unit the user belongs to." }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Represents a project row in the Founder-Off system.",
+      "type": "object",
+      "properties": {
+        "Project_ID": { "type": "string" },
+        "Project_Type": { "type": "string", "enum": ["Task", "Project", "Deliverable", "Approval Item", "Follow-Up Item"] },
+        "Linked_Objectives": { "type": "string" },
+        "Time_Horizon": { "type": "string", "enum": ["Sprint (≤30 days)", "60 Days", "90 Days", "Quarter", "Strategic Fix", "Strategic Build", "Expansion", "Governance", "Handover"] },
+        "Priority_Level": { "type": "string", "enum": ["A", "B", "C"] },
+        "Business_Unit": { "type": "string" },
+        "Project_Name": { "type": "string" },
+        "Success_Definition": { "type": "string" },
+        "Assigned_Leader": { "type": "string" },
+        "Start_Date": { "type": "string", "format": "date" },
+        "Target_End_Date": { "type": "string", "format": "date" },
+        "Need_Clarification_?": { "type": "string", "enum": ["Yes", "No"] },
+        "Owner_Restatement": { "type": "string" },
+        "Days_To_Deadline": { "type": "number" },
+        "Project_Status": { "type": "string", "enum": ["New", "Assigned", "Confirmed", "In Progress", "Submitted", "Returned", "Approved", "Escalated", "Closed", "Cancelled", "For Review", "Building", "For Scheduling", "Hold", "Done - Implemented", "Accomplished"] },
+        "Blocked_Reason": { "type": "string", "enum": ["Waiting on Decision", "Waiting on Another Team", "Waiting on Supplier", "Waiting on Budget", "Waiting on Owner Action", "Issue Encountered", "No Blocker"] },
+        "Execution_Facts_Update": { "type": "string" },
+        "Next_Update_Due": { "type": "string", "format": "date" },
+        "Last_Updated_Date": { "type": "string", "format": "date-time" },
+        "Health_Status": { "type": "string", "enum": ["Green", "Yellow", "Red"] },
+        "Health_Status_Reason": { "type": "string" },
+        "Completed_Date": { "type": "string", "format": "date" },
+        "Proof_Link": { "type": "string" },
+        "Weeks_In_Use": { "type": "number" },
+        "Complete_With_Proof?": { "type": "string", "enum": ["Yes", "No", "N/A"] },
+        "On_Time?": { "type": "string", "enum": ["Yes", "No", "N/A"] },
+        "Okay_Quality?": { "type": "string", "enum": ["Yes", "No", "N/A"] },
+        "GM_Consult_Required": { "type": "string", "enum": ["Yes", "No"] },
+        "Reviewer_Decision": { "type": "string", "enum": ["Approve", "Return", "Escalate"] },
+        "Return_Reason": { "type": "string", "enum": ["Incomplete", "Unclear", "Below Standard", "Missing Proof", "Wrong Format", "Late", "Needs Revision"] },
+        "Escalation_Reason": { "type": "string" },
+        "Verified_By": { "type": "string" },
+        "Verified_Date": { "type": "string", "format": "date" },
+        "Final_Decision_By_Reviewer": { "type": "string", "enum": ["Approved", "Rejected", "Escalated", "Closed"] },
+        "Auto_Trigger_Hit_Suggested": { "type": "string" },
+        "Trigger_Hit": { "type": "string" },
+        "Trigger_Severity": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+        "Trigger_Auto_Action": { "type": "string" },
+        "Trigger_Consequence_Level": { "type": "string", "enum": ["Level 0 — No Consequence", "Level 1 — Reminder / Correction", "Level 2 — Return and Resubmit", "Level 3 — Escalate to SMA", "Level 4 — Escalate to BU Head / GM", "Level 5 — Performance / Role Review"] },
+        "Trigger_Count": { "type": "number" },
+        "Root_Cause_Type": { "type": "string", "enum": ["Skill Gap", "Capacity Issue", "Unclear Standard", "Resource Constraint", "Process Gap", "Ownership Issue", "External Dependency", "Unknown"] },
+        "MD_Intervention": { "type": "string", "enum": ["Yes", "No"] },
+        "Redesign_Required": { "type": "string", "enum": ["Yes", "No"] },
+        "Repeat_Miss_Count": { "type": "number" }
+      },
+      "required": ["Project_ID", "Project_Name", "Assigned_Leader", "Target_End_Date", "Project_Status"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "Collection of users and their roles." },
+    "projects": { "schema": "Project", "description": "Collection of project rows." }
+  }
+}
