@@ -20,7 +20,12 @@ import {
   ArrowLeft,
   User as UserIcon,
   BarChart3,
-  ListTodo
+  ListTodo,
+  LayoutGrid,
+  Table as TableIcon,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -43,7 +48,7 @@ interface DashboardProps {
   user: User;
 }
 
-type FilterType = 'all' | 'red' | 'overdue' | 'review' | 'my-tasks' | 'my-bu';
+type FilterType = 'all' | 'red' | 'yellow' | 'green' | 'overdue' | 'review' | 'my-tasks' | 'my-bu';
 
 export default function Dashboard({ user }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'projects' | 'create' | 'review' | 'founder' | 'profile'>('projects');
@@ -57,6 +62,14 @@ export default function Dashboard({ user }: DashboardProps) {
     return localStorage.getItem(`onboarding_dismissed_${user.uid}`) === 'true';
   });
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
+    return (localStorage.getItem(`view_mode_${user.uid}`) as 'card' | 'table') || 'card';
+  });
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(`view_mode_${user.uid}`, viewMode);
+  }, [viewMode, user.uid]);
 
   useEffect(() => {
     // Set initial tab based on role
@@ -232,12 +245,42 @@ export default function Dashboard({ user }: DashboardProps) {
     
     return true;
   }).sort((a, b) => {
+    if (sortConfig) {
+      const { key, direction } = sortConfig;
+      let aValue: any = a[key as keyof Project];
+      let bValue: any = b[key as keyof Project];
+
+      if (key === 'daysRemaining') {
+        aValue = getDaysRemaining(a.Target_End_Date || '') || 999;
+        bValue = getDaysRemaining(b.Target_End_Date || '') || 999;
+      }
+
+      if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+      return 0;
+    }
+
     if (user.role === 'sma') {
       const severityMap: any = { 'Critical': 3, 'High': 2, 'Medium': 1, 'Low': 0 };
       return (severityMap[b.Trigger_Severity || 'Low'] || 0) - (severityMap[a.Trigger_Severity || 'Low'] || 0);
     }
     return 0;
   });
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => {
+      if (prev?.key === key) {
+        if (prev.direction === 'asc') return { key, direction: 'desc' };
+        return null;
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig?.key !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-stone-900" /> : <ChevronDown className="w-3 h-3 ml-1 text-stone-900" />;
+  };
 
   const handleSignOut = () => signOut(auth);
 
@@ -632,8 +675,26 @@ export default function Dashboard({ user }: DashboardProps) {
               </div>
             </div>
 
-            {activeTab === 'projects' && !selectedProject && (
-              <div className="flex items-center gap-2">
+            {(activeTab === 'projects' || activeTab === 'founder' || activeTab === 'review') && !selectedProject && (
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle */}
+                <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
+                  <button 
+                    onClick={() => setViewMode('card')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    title="Card View"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('table')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+                    title="Table View"
+                  >
+                    <TableIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-stone-400" />
                   <input 
@@ -751,6 +812,8 @@ export default function Dashboard({ user }: DashboardProps) {
                       />
                     )
                   ) : (
+                    <>
+                      {viewMode === 'card' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
@@ -1021,7 +1084,6 @@ export default function Dashboard({ user }: DashboardProps) {
                             )}
                           </div>
                         ))
-
                       ) : (
                         user.role === 'founder' && activeTab === 'founder' ? (
                           <div className="col-span-full flex flex-col items-center justify-center py-32 bg-emerald-50 rounded-[3rem] border-2 border-dashed border-emerald-200 text-center px-6">
@@ -1047,9 +1109,172 @@ export default function Dashboard({ user }: DashboardProps) {
                         )
                       )}
                     </div>
+                  ) : (
+                    /* Table View Implementation */
+                    <div className="bg-white rounded-[2.5rem] border border-stone-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-stone-50 border-b border-stone-200">
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Health_Status')}
+                              >
+                                <div className="flex items-center">Health <SortIcon columnKey="Health_Status" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Priority_Level')}
+                              >
+                                <div className="flex items-center">Pri <SortIcon columnKey="Priority_Level" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Project_Name')}
+                              >
+                                <div className="flex items-center">Project Name <SortIcon columnKey="Project_Name" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Business_Unit')}
+                              >
+                                <div className="flex items-center">BU <SortIcon columnKey="Business_Unit" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Assigned_Leader')}
+                              >
+                                <div className="flex items-center">Owner <SortIcon columnKey="Assigned_Leader" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('Project_Status')}
+                              >
+                                <div className="flex items-center">Status <SortIcon columnKey="Project_Status" /></div>
+                              </th>
+                              <th 
+                                className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors"
+                                onClick={() => handleSort('daysRemaining')}
+                              >
+                                <div className="flex items-center">Deadline <SortIcon columnKey="daysRemaining" /></div>
+                              </th>
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100">
+                            {loading ? (
+                              Array.from({ length: 5 }).map((_, i) => (
+                                <tr key={i} className="animate-pulse">
+                                  <td colSpan={8} className="px-4 py-4"><div className="h-4 bg-stone-100 rounded w-full"></div></td>
+                                </tr>
+                              ))
+                            ) : filteredProjects.length > 0 ? (
+                              filteredProjects.map((project) => (
+                                <tr 
+                                  key={project.id} 
+                                  onClick={() => setSelectedProject(project)}
+                                  className="hover:bg-stone-50 transition-colors cursor-pointer group"
+                                >
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-2 h-2 rounded-full ${
+                                        project.Health_Status === 'Green' ? 'bg-emerald-500' :
+                                        project.Health_Status === 'Yellow' ? 'bg-amber-500' :
+                                        'bg-red-500'
+                                      }`} />
+                                      <span className="text-[10px] font-bold text-stone-500 uppercase">{project.Health_Status}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                      project.Priority_Level === 'A' ? 'bg-red-100 text-red-600' :
+                                      project.Priority_Level === 'B' ? 'bg-orange-100 text-orange-600' :
+                                      'bg-stone-100 text-stone-500'
+                                    }`}>
+                                      {project.Priority_Level}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-col max-w-[200px]">
+                                      <span className="font-bold text-stone-900 text-xs truncate">{project.Project_Name}</span>
+                                      {project.Trigger_Hit && project.Trigger_Hit !== 'None' && (
+                                        <span className="text-[9px] font-black text-red-600 uppercase tracking-tight truncate">🔴 {project.Trigger_Hit}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{project.Business_Unit}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-1.5 text-[11px] text-stone-600 truncate max-w-[120px]">
+                                      <Users className="w-3 h-3 text-stone-400" />
+                                      <span className="truncate">{project.Assigned_Leader}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase whitespace-nowrap ${
+                                      project.Project_Status === 'Returned' ? 'bg-orange-100 text-orange-700' :
+                                      project.Project_Status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                                      'bg-stone-100 text-stone-600'
+                                    }`}>
+                                      {user.role === 'owner' && project.Project_Status === 'Returned' ? 'Feedback Received' : project.Project_Status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className={`text-[9px] font-bold uppercase whitespace-nowrap ${getDaysLeftInfo(getDaysRemaining(project.Target_End_Date || '')).color}`}>
+                                      {getDaysLeftInfo(getDaysRemaining(project.Target_End_Date || '')).text}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      {user.role === 'sma' && (
+                                        <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); handleQuickAction(project.id!, 'Trigger_Hit', 'Manual Flag'); }}
+                                            className="px-2 py-1 bg-stone-100 text-stone-600 rounded text-[9px] font-bold uppercase hover:bg-stone-200"
+                                            title="Flag"
+                                          >
+                                            Flag
+                                          </button>
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); handleQuickAction(project.id!, 'Health_Status', 'Red'); }}
+                                            className="px-2 py-1 bg-red-50 text-red-600 rounded text-[9px] font-bold uppercase hover:bg-red-100"
+                                            title="Override to Red"
+                                          >
+                                            Override
+                                          </button>
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); handleQuickAction(project.id!, 'MD_Intervention', 'Yes'); }}
+                                            className="px-2 py-1 bg-stone-900 text-white rounded text-[9px] font-bold uppercase hover:bg-stone-800"
+                                            title="MD Intervention"
+                                          >
+                                            MD
+                                          </button>
+                                        </div>
+                                      )}
+                                      <div className="p-1.5 hover:bg-stone-200 rounded-lg transition-colors">
+                                        <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-stone-900" />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={8} className="px-4 py-20 text-center">
+                                  <p className="text-stone-500">No projects found matching your criteria.</p>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   )}
-                </div>
+                </>
               )}
+            </div>
+          )}
 
               {activeTab === 'create' && (
                 <div className="max-w-2xl mx-auto">
@@ -1072,7 +1297,7 @@ export default function Dashboard({ user }: DashboardProps) {
                         />
                       </div>
                     </div>
-                  ) : (
+                  ) : viewMode === 'card' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
@@ -1153,6 +1378,68 @@ export default function Dashboard({ user }: DashboardProps) {
                           <p className="text-stone-400 text-sm">Submitted projects will appear here for verification.</p>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    /* Table View for Review Queue */
+                    <div className="bg-white rounded-[2.5rem] border border-stone-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-stone-50 border-b border-stone-200">
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors" onClick={() => handleSort('Health_Status')}>
+                                <div className="flex items-center">Health <SortIcon columnKey="Health_Status" /></div>
+                              </th>
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors" onClick={() => handleSort('Project_Name')}>
+                                <div className="flex items-center">Project Name <SortIcon columnKey="Project_Name" /></div>
+                              </th>
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors" onClick={() => handleSort('Assigned_Leader')}>
+                                <div className="flex items-center">Owner <SortIcon columnKey="Assigned_Leader" /></div>
+                              </th>
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest cursor-pointer hover:bg-stone-100 transition-colors" onClick={() => handleSort('Last_Updated_Date')}>
+                                <div className="flex items-center">Submitted <SortIcon columnKey="Last_Updated_Date" /></div>
+                              </th>
+                              <th className="px-4 py-4 text-[10px] font-black text-stone-400 uppercase tracking-widest text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100">
+                            {projects.length > 0 ? (
+                              projects.map((project) => (
+                                <tr key={project.id} onClick={() => setSelectedProject(project)} className="hover:bg-stone-50 transition-colors cursor-pointer group">
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-2 h-2 rounded-full ${project.Health_Status === 'Green' ? 'bg-emerald-500' : project.Health_Status === 'Yellow' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                      <span className="text-[10px] font-bold text-stone-500 uppercase">{project.Health_Status}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-stone-900 text-xs">{project.Project_Name}</span>
+                                      <span className="text-[9px] text-stone-400 font-mono">{project.Project_ID}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-[11px] text-stone-600">{project.Assigned_Leader}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-[10px] font-medium text-stone-500">
+                                      {project.Last_Updated_Date?.toDate ? project.Last_Updated_Date.toDate().toLocaleDateString() : 'Recent'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button className="px-3 py-1 bg-stone-900 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-stone-800 transition-colors">
+                                      Review
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="px-4 py-20 text-center text-stone-500">Review queue is empty.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </>
